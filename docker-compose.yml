@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  llm-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hpclab-llm-bot
+    volumes:
+      - code:./src
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["curl", "0.0.0.0:8000"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+    secrets:
+      - bot-secrets
+
+secrets:
+  bot-secrets:
+    file: ./vault-secrets.yml
+
+volumes:
+  code:

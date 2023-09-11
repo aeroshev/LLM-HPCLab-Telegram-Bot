@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+aiogram = "==3.0.0"
+pyyaml = "==6.0.1"
+
+[dev-packages]
+mypy = "==1.5.1"
+flake8 = "==6.1.0"
+isort = "==5.12.0"
+
+[requires]
+python_version = "3.11"
+python_full_version = "3.11.5"
