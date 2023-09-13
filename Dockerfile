@@ -1,6 +1,9 @@
 FROM python:3.11.5-alpine3.18
 
-RUN pip install -U pip && pip install -U setuptools && pip install -U wheel
-RUN pip install -r requirements
+COPY requirements.txt requirements.txt
 
-CMD ["python", "src/main.py"]
+RUN pip install -U pip && pip install -U setuptools && pip install -U wheel
+RUN pip install -r requirements.txt && rm -f requirements.txt
+
+
+CMD ["python", "code/main.py"]

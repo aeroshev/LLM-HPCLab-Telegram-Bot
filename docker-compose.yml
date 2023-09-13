@@ -7,11 +7,11 @@ services:
       dockerfile: Dockerfile
     container_name: hpclab-llm-bot
     volumes:
-      - code:./src
+      - ./src:/code
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["curl", "0.0.0.0:8000"]
+      test: ["CMD-SHELL", "curl", "0.0.0.0:8000"]
       interval: 10s
       timeout: 30s
       retries: 5
