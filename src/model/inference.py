@@ -46,10 +46,10 @@ class ModelInference:
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
     
-    async def answer(self, input: str) -> str:
+    def answer(self, input: str) -> str:
         conversation = Conversation()
         conversation.add_user_message(input)
         prompt = conversation.get_prompt(self.tokenizer)
 
-        output = await self.generate(self.model, self.tokenizer, prompt, self.generation_config)
+        output = self.generate(prompt)
         return output

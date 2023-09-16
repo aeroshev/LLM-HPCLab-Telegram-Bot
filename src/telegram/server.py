@@ -19,6 +19,8 @@ TOKEN = settings.BOT_TOKEN
 dp = Dispatcher()
 inference = ModelInference()
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
@@ -45,9 +47,10 @@ async def echo_handler(message: types.Message) -> None:
         # Send a copy of the received message
         model_answer = inference.answer(message.text)
         await message.answer(model_answer)
-    except TypeError:
+    except Exception as e:
         # But not all the types is supported to be copied so need to handle it
         await message.answer("Извини, не понял тебя")
+        _LOGGER.exception(e)
 
 
 async def main() -> None:
