@@ -4,7 +4,10 @@ DEFAULT_MESSAGE_TEMPLATE: Final[str] = "<s>{role}\n{content}</s>\n"
 DEFAULT_SYSTEM_PROMPT: Final[str] = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
 
 class Conversation:
-
+    """
+    Класс диалога модели с пользователем.
+    Формирует промт заранее опредлённого формата.
+    """
     def __init__(
         self,
         message_template: str = DEFAULT_MESSAGE_TEMPLATE,

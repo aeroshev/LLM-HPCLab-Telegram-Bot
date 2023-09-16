@@ -1,9 +1,6 @@
-import asyncio
 import logging
-import sys
-from os import getenv
 
-from aiogram import Bot, Dispatcher, Router, types
+from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message
@@ -45,7 +42,7 @@ async def echo_handler(message: types.Message) -> None:
     """
     try:
         # Send a copy of the received message
-        model_answer = inference.answer(message.text)
+        model_answer = inference.answer(message.text, message.chat.id)
         await message.answer(model_answer)
     except Exception as e:
         # But not all the types is supported to be copied so need to handle it
