@@ -9,17 +9,24 @@ services:
     volumes:
       - ./src:/code
     ports:
-      - "8000:8000"
+      - "8080:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl", "0.0.0.0:8000"]
+      test: ["CMD-SHELL", "curl", "0.0.0.0:8080"]
       interval: 10s
       timeout: 30s
       retries: 5
     secrets:
-      - bot-secrets
+      - vault-secrets.yml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 secrets:
-  bot-secrets:
+  vault-secrets.yml:
     file: ./vault-secrets.yml
 
 volumes:
