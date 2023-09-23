@@ -8,6 +8,7 @@ services:
     container_name: hpclab-llm-bot
     volumes:
       - ./src:/code
+      - /home/artem.eroshev/.cache:/root/.cache
     ports:
       - "8080:8080"
     healthcheck:
@@ -28,6 +29,3 @@ services:
 secrets:
   vault-secrets.yml:
     file: ./vault-secrets.yml
-
-volumes:
-  code:
