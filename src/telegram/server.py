@@ -2,12 +2,12 @@ import logging
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.utils.markdown import hbold
 
 import settings
-from model.inference import ModelInference
+from model.inference import ModelInference, CONVERSION_CACHE
 
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = settings.BOT_TOKEN
@@ -33,6 +33,11 @@ async def command_start_handler(message: Message) -> None:
                          "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa")
 
 
+@dp.message(Command('clean_context'))
+async def command_clean_context(message: Message) -> None:
+    del CONVERSION_CACHE[message.chat_id]
+
+
 @dp.message()
 async def echo_handler(message: types.Message) -> None:
     """
@@ -42,7 +47,7 @@ async def echo_handler(message: types.Message) -> None:
     """
     try:
         # Send a copy of the received message
-        model_answer = inference.answer(message.text, message.chat.id)
+        model_answer = inference(message.text, message.chat.id)
         await message.answer(model_answer)
     except Exception as e:
         # But not all the types is supported to be copied so need to handle it

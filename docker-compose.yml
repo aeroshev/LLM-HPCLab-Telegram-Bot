@@ -7,10 +7,11 @@ services:
       dockerfile: Dockerfile
     container_name: hpclab-llm-bot
     volumes:
-      - ./src:/code
-      - /home/artem.eroshev/.cache:/root/.cache
+      - ./src:/code/src
+      - tf-data:/root/.cache
     ports:
       - "8080:8080"
+      - "8000:8000"
     healthcheck:
       test: ["CMD-SHELL", "curl", "0.0.0.0:8080"]
       interval: 10s
@@ -68,3 +69,6 @@ services:
 secrets:
   vault-secrets.yml:
     file: ./vault-secrets.yml
+
+volumes:
+  tf-data:

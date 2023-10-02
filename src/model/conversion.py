@@ -40,6 +40,9 @@ class Conversation:
             "role": "bot",
             "content": message
         })
+    
+    def __len__(self) -> int:
+        return len(self.messages)
 
     def get_prompt(self, tokenizer) -> str:
         final_text: str = ""

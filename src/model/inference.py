@@ -7,6 +7,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, 
 from cachetools import TTLCache
 
 from .conversion import Conversation
+from metrics import CHAT_COUNTS, REQUEST_TIME
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga2_7b_lora"
 BASE_MODEL_PATH: Final[str] = "TheBloke/Llama-2-7B-fp16"
@@ -16,7 +17,7 @@ CONVERSION_CACHE: TTLCache = TTLCache(
     ttl=timedelta(hours=12),
     timer=datetime.now
 )
-
+CHAT_COUNTS.set_function(lambda: len(CONVERSION_CACHE)) 
 
 class ModelInference:
     """
@@ -38,7 +39,6 @@ class ModelInference:
         quantization_config: BitsAndBytesConfig = BitsAndBytesConfig(
             load_in_4bit=True
         )
-        config = PeftConfig.from_pretrained(MODEL_NAME)
         self.model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL_PATH,
             torch_dtype=torch.float32,
@@ -70,7 +70,8 @@ class ModelInference:
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
     
-    def answer(self, input: str, chat_id: int) -> str:
+    @REQUEST_TIME.time()
+    def __call__(self, input: str, chat_id: int) -> str:
         """
         Подготовить промпт для модели из истории диалога и запросить ответ.
         :param input: новый запрос от пользователя.
