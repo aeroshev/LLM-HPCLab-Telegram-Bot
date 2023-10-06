@@ -7,15 +7,24 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, 
 from cachetools import TTLCache
 
 from .conversion import Conversation
+from metrics import CHAT_COUNTS, REQUEST_TIME, DEPTH_CONVERSION
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga2_7b_lora"
 BASE_MODEL_PATH: Final[str] = "TheBloke/Llama-2-7B-fp16"
+
+
+def track_depth(cache: TTLCache) -> None:
+    """Отслеживание глубины каждого чата"""
+    for record_key in cache:
+        DEPTH_CONVERSION.labels(f'{record_key}').set(len(cache[record_key]))
+
 
 CONVERSION_CACHE: TTLCache = TTLCache(
     maxsize=10,
     ttl=timedelta(hours=12),
     timer=datetime.now
 )
+CHAT_COUNTS.set_function(lambda: len(CONVERSION_CACHE))
 
 
 class ModelInference:
@@ -38,7 +47,6 @@ class ModelInference:
         quantization_config: BitsAndBytesConfig = BitsAndBytesConfig(
             load_in_4bit=True
         )
-        config = PeftConfig.from_pretrained(MODEL_NAME)
         self.model = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL_PATH,
             torch_dtype=torch.float32,
@@ -70,7 +78,8 @@ class ModelInference:
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
     
-    def answer(self, input: str, chat_id: int) -> str:
+    @REQUEST_TIME.time()
+    def __call__(self, input: str, chat_id: int) -> str:
         """
         Подготовить промпт для модели из истории диалога и запросить ответ.
         :param input: новый запрос от пользователя.
@@ -82,6 +91,7 @@ class ModelInference:
             CONVERSION_CACHE[chat_id] = conversation
         else:
             conversation = CONVERSION_CACHE[chat_id]
+        track_depth(CONVERSION_CACHE)
         
         conversation.add_user_message(input)
         prompt = conversation.get_prompt(self.tokenizer)
