@@ -10,13 +10,10 @@ services:
       - ./src:/code/src
       - tf-data:/root/.cache
     ports:
-      - "8080:8080"
-      - "8000:8000"
-    healthcheck:
-      test: ["CMD-SHELL", "curl", "0.0.0.0:8080"]
-      interval: 10s
-      timeout: 30s
-      retries: 5
+      - 8080:8080
+      - 8000:8000
+    environment:
+      - CACHE_ADDRESS=${CACHE_ADDRESS}
     secrets:
       - vault-secrets.yml
     deploy:
@@ -26,6 +23,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    depends_on:
+      - cache
 
   dcgm_exporter:
     container_name: dcgm-exporter
@@ -79,9 +78,35 @@ services:
     networks:
       - default
 
+  volume-exporter:
+    container_name: volume-exporter
+    image: mnadeem/volume_exporter
+    volumes:
+      - tf-data:/tmp/tf-data
+      - cache-data:/tmp/cache-data
+    command:
+      - --volume-dir=model-data:/tmp/tf-data
+      - --volume-dir=cache-data:/tmp/cache-data
+    ports:
+      - 9889:9888
+    restart: unless-stopped
+    networks:
+      - default
+  
+  cache:
+    container_name: redis-cache
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - cache-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+
 secrets:
   vault-secrets.yml:
     file: ./vault-secrets.yml
 
 volumes:
   tf-data:
+  cache-data:
