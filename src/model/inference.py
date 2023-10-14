@@ -5,6 +5,7 @@ from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, BitsAndBytesConfig
 
 from model.conversion import Conversation
+from metrics import REQUEST_TIME
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga2_7b_lora"
 BASE_MODEL_PATH: Final[str] = "TheBloke/Llama-2-7B-fp16"
@@ -61,6 +62,7 @@ class ModelInference:
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
     
+    @REQUEST_TIME.time()
     def __call__(self, сonversation: Conversation) -> str:
         """
         Подготовить промпт для модели из истории диалога и запросить ответ.
