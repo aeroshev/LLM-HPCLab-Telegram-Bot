@@ -1,62 +1,103 @@
 import logging
+import asyncio
+from typing import Final
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
 from aiogram.utils.markdown import hbold
 
 import settings
-from model.inference import ModelInference, CONVERSION_CACHE
+from model.inference import ModelInference
+from telegram.cache import ConversionCache
+from telegram.manager import ModelManager
+from exceptions import ExistChatError, NotExistChatError
+from metrics import depth_conversion_track, chat_counts_track
 
-# Bot token can be obtained via https://t.me/BotFather
-TOKEN = settings.BOT_TOKEN
+TOKEN: Final[str] = settings.BOT_TOKEN
 
-# All handlers should be attached to the Router (or Dispatcher)
-dp = Dispatcher()
-inference = ModelInference()
+dp: Dispatcher = Dispatcher()
 
-_LOGGER = logging.getLogger(__name__)
+CACHE: Final[ConversionCache] = ConversionCache()
+manager: ModelManager = ModelManager(
+    inference=ModelInference(),
+    cache=CACHE
+)
+
+_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 @dp.message(CommandStart())
-async def command_start_handler(message: Message) -> None:
+async def command_start_handler(message: types.Message) -> None:
     """
-    This handler receives messages with `/start` command
+    Начать взаимодействие с ботом `/start` командой
+    :param message: сообщение от пользователя
+    :return:
     """
-    # Most event objects have aliases for API methods that can be called in events' context
-    # For example if you want to answer to incoming message you can use `message.answer(...)` alias
-    # and the target chat will be passed to :ref:`aiogram.methods.send_message.SendMessage`
-    # method automatically or call API method directly via
-    # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
-    await message.answer(f"Привествую, {hbold(message.from_user.full_name)}!\n" \
-                         "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa")
+    try:
+        await manager.start_conversion(message.chat.id)
+    except ExistChatError:
+        await message.answer("У нас с тобой уже есть история переписки, если хочешь начать заново," \
+                             " выбери команду /reset_context")
+    else:
+        await message.answer(f"Привествую, {hbold(message.from_user.full_name)}!\n" \
+                            "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa")
 
 
-@dp.message(Command('clean_context'))
-async def command_clean_context(message: Message) -> None:
-    del CONVERSION_CACHE[message.chat_id]
+@dp.message(Command('reset_context'))
+async def command_clean_context(message: types.Message) -> None:
+    """
+    Очистить весь контекст переписки с ботом
+    :param message: сообщение от пользователя
+    :return:
+    """
+    await manager.reset_context(message.chat.id)
+
+
+@dp.message(Command('help'))
+async def command_help_handler(message: types.Message) -> None:
+    """
+    Вернуть подсказку для общения с ботом
+    :param message: сообщение от пользователя
+    :return:
+    """
+    await message.answer(
+        '''
+        Я телеграмм бот LLM модели Llama 7B лаборатории HPC НИЯУ МИФИ.
+        Просто напиши в чат, чтобы общаться со мной.
+        /start - начать общение со мной.
+        /reset_context - сбросить историю переписок со мной.
+        /help - вызвать подсказку.
+        '''
+    )
 
 
 @dp.message()
-async def echo_handler(message: types.Message) -> None:
+async def conversation_handler(message: types.Message) -> None:
     """
-    Handler will forward receive a message back to the sender
-
-    By default, message handler will handle all message types (like a text, photo, sticker etc.)
+    Задать вопрос LLM модели.
+    :param message: сообщение от пользователя
+    :return:
     """
     try:
-        # Send a copy of the received message
-        model_answer = inference(message.text, message.chat.id)
+        model_answer: str = await manager.answer(message.chat.id, message.text)
         await message.answer(model_answer)
+    except NotExistChatError:
+        await message.answer("Похоже мы не начали общение, введи команду /start для старта переписки")
     except Exception as e:
-        # But not all the types is supported to be copied so need to handle it
         await message.answer("Извини, не понял тебя")
         _LOGGER.exception(e)
 
 
 async def main() -> None:
-    # Initialize Bot instance with a default parse mode which will be passed to all API calls
+    """
+    Запуск бота и его метрик.
+    :param:
+    :return:
+    """
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+    loop.create_task(depth_conversion_track(CACHE))
+    loop.create_task(chat_counts_track(CACHE))
+
     bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
-    # And the run events dispatching
     await dp.start_polling(bot)

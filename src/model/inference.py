@@ -1,30 +1,13 @@
 from typing import Final
-from datetime import datetime, timedelta
 
 import torch
-from peft import PeftModel, PeftConfig
+from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, BitsAndBytesConfig
-from cachetools import TTLCache
 
-from .conversion import Conversation
-from metrics import CHAT_COUNTS, REQUEST_TIME, DEPTH_CONVERSION
+from model.conversion import Conversation
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga2_7b_lora"
 BASE_MODEL_PATH: Final[str] = "TheBloke/Llama-2-7B-fp16"
-
-
-def track_depth(cache: TTLCache) -> None:
-    """Отслеживание глубины каждого чата"""
-    for record_key in cache:
-        DEPTH_CONVERSION.labels(f'{record_key}').set(len(cache[record_key]))
-
-
-CONVERSION_CACHE: TTLCache = TTLCache(
-    maxsize=10,
-    ttl=timedelta(hours=12),
-    timer=datetime.now
-)
-CHAT_COUNTS.set_function(lambda: len(CONVERSION_CACHE))
 
 
 class ModelInference:
@@ -78,23 +61,13 @@ class ModelInference:
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
     
-    @REQUEST_TIME.time()
-    def __call__(self, input: str, chat_id: int) -> str:
+    def __call__(self, сonversation: Conversation) -> str:
         """
         Подготовить промпт для модели из истории диалога и запросить ответ.
         :param input: новый запрос от пользователя.
         :param chat_id: индефикатор чата, для различия пользователей.
         :return: ответ модели в формате строки.
         """
-        if not CONVERSION_CACHE.get(chat_id):
-            conversation = Conversation()
-            CONVERSION_CACHE[chat_id] = conversation
-        else:
-            conversation = CONVERSION_CACHE[chat_id]
-        track_depth(CONVERSION_CACHE)
-        
-        conversation.add_user_message(input)
-        prompt = conversation.get_prompt(self.tokenizer)
-
+        prompt = сonversation.get_prompt(self.tokenizer)
         output = self.generate(prompt)
         return output
