@@ -45,7 +45,7 @@ class Conversation:
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         start_token_id: int = 1,
         bot_token_id: int = 9225,
-        messages:list[Message] | None = None
+        messages: list[Message] | None = None
     ) -> None:
         self.message_template: str = message_template
         self.start_token_id: int = start_token_id
