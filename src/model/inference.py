@@ -2,10 +2,18 @@ from typing import Final
 
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, BitsAndBytesConfig
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    GenerationConfig,
+    LlamaModel,
+    LlamaPreTrainedModel,
+    LlamaTokenizerFast,
+)
 
-from model.conversion import Conversation
 from metrics import REQUEST_TIME
+from model.conversion import Conversation
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga2_7b_lora"
 BASE_MODEL_PATH: Final[str] = "TheBloke/Llama-2-7B-fp16"
@@ -22,7 +30,7 @@ class ModelInference:
     )
 
     def __init__(self) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer: LlamaTokenizerFast = AutoTokenizer.from_pretrained(
             MODEL_NAME,
             use_fast=True,
             legacy=False
@@ -31,21 +39,21 @@ class ModelInference:
         quantization_config: BitsAndBytesConfig = BitsAndBytesConfig(
             load_in_4bit=True
         )
-        self.model = AutoModelForCausalLM.from_pretrained(
+        self.model: LlamaPreTrainedModel = AutoModelForCausalLM.from_pretrained(
             BASE_MODEL_PATH,
             torch_dtype=torch.float32,
             device_map="auto",
             quantization_config=quantization_config
         )
-        self.model = PeftModel.from_pretrained(
+        self.model: LlamaModel = PeftModel.from_pretrained(
             self.model,
             MODEL_NAME,
             torch_dtype=torch.float32
         )
         self.model.eval()
 
-        self.generation_config = GenerationConfig.from_pretrained(MODEL_NAME)
-    
+        self.generation_config: GenerationConfig = GenerationConfig.from_pretrained(MODEL_NAME)
+
     def generate(self, prompt: str) -> str:
         """
         Сгенерировать ответ модели.
@@ -61,7 +69,7 @@ class ModelInference:
         output_ids = output_ids[len(data["input_ids"][0]):]
         output = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         return output.strip()
-    
+
     @REQUEST_TIME.time()
     def __call__(self, сonversation: Conversation) -> str:
         """

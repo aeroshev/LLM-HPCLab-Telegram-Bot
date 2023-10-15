@@ -1,18 +1,18 @@
-import logging
 import asyncio
+import logging
 from typing import Final
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import Command, CommandStart
 from aiogram.utils.markdown import hbold
 
 import settings
+from exceptions import ExistChatError, NotExistChatError
+from metrics import start_tracking
 from model.inference import ModelInference
 from telegram.cache import ConversionCache
 from telegram.manager import ModelManager
-from exceptions import ExistChatError, NotExistChatError
-from metrics import depth_conversion_track, chat_counts_track
 
 TOKEN: Final[str] = settings.BOT_TOKEN
 
@@ -35,13 +35,17 @@ async def command_start_handler(message: types.Message) -> None:
     :return:
     """
     try:
-        await manager.start_conversion(message.chat.id)
+        await manager.start_conversion(message.chat.id, message.from_user.username)
     except ExistChatError:
-        await message.answer("У нас с тобой уже есть история переписки, если хочешь начать заново," \
-                             " выбери команду /reset_context")
+        await message.answer(
+            "У нас с тобой уже есть история переписки, если хочешь начать заново,"
+            " выбери команду /reset_context"
+        )
     else:
-        await message.answer(f"Привествую, {hbold(message.from_user.full_name)}!\n" \
-                            "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa")
+        await message.answer(
+            f"Привествую, {hbold(message.from_user.full_name)}!\n"
+            "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa"
+        )
 
 
 @dp.message(Command('reset_context'))
@@ -96,8 +100,7 @@ async def main() -> None:
     :return:
     """
     loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-    loop.create_task(depth_conversion_track(CACHE))
-    loop.create_task(chat_counts_track(CACHE))
+    start_tracking(loop, CACHE)
 
     bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
     await dp.start_polling(bot)

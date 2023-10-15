@@ -1,10 +1,10 @@
-from typing import Final
 from enum import Enum
+from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
 DEFAULT_MESSAGE_TEMPLATE: Final[str] = "<s>{role}\n{content}</s>\n"
-DEFAULT_SYSTEM_PROMPT: Final[str] = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
+DEFAULT_SYSTEM_PROMPT: Final[str] = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."  # noqa
 
 
 class Role(str, Enum):
@@ -81,10 +81,10 @@ class Conversation:
                 content=message
             )
         )
-    
+
     def __len__(self) -> int:
         return len(self.messages)
-    
+
     def get_prompt(self, tokenizer) -> str:
         final_text: str = ""
         for message in self.messages:  # type: dict[str, str]
