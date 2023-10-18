@@ -55,7 +55,7 @@ async def command_clean_context(message: types.Message) -> None:
     :param message: сообщение от пользователя
     :return:
     """
-    await manager.reset_context(message.chat.id)
+    await manager.reset_context(message.chat.id, message.from_user.username)
 
 
 @dp.message(Command('help'))

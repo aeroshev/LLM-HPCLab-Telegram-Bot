@@ -63,11 +63,11 @@ class ModelManager:
 
         return output
 
-    async def reset_context(self, chat_id: int) -> None:
+    async def reset_context(self, chat_id: int, username: str) -> None:
         """
         Очистить переписку с моделью.
         :param chat_id: индефикатор чата, для различия пользователей.
         :return:
         """
         await self.cache.clear_conversion(chat_id)
-        await self.start_conversion(chat_id)
+        await self.start_conversion(chat_id, username)
