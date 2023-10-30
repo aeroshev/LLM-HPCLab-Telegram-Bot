@@ -3,7 +3,7 @@ from pathlib import Path
 
 from prometheus_client import Gauge, Summary
 
-from telegram.cache import ConversionCache
+from hpc_bot.telegram.cache import ConversationCache
 
 DEPTH_CONVERSION: Gauge = Gauge('depth_conversion', 'Глубина чата с пользователем', ['chat_id'])
 CHAT_COUNTS: Gauge = Gauge('quantity_chats', 'Количество открытых чатов')
@@ -26,7 +26,7 @@ def get_size(folder_path: str = '.') -> int:
     )
 
 
-async def depth_conversion_track(cache: ConversionCache, sleep_time: int = 5) -> None:
+async def depth_conversion_track(cache: ConversationCache, sleep_time: int = 5) -> None:
     """
     Проставить в метрике глубину каждого чата.
     :param cache: кэш откуда брать информацию о записях.
@@ -41,7 +41,7 @@ async def depth_conversion_track(cache: ConversionCache, sleep_time: int = 5) ->
         await asyncio.sleep(sleep_time)
 
 
-async def chat_counts_track(cache: ConversionCache, sleep_time: int = 5) -> None:
+async def chat_counts_track(cache: ConversationCache, sleep_time: int = 5) -> None:
     """
     Проставить в метрике количество активных чатов.
     :param cache: кэш откуда брать информацию о записях.
@@ -65,7 +65,7 @@ async def weights_size_track(sleep_time: int = 5) -> None:
         await asyncio.sleep(sleep_time)
 
 
-def start_tracking(loop: asyncio.AbstractEventLoop, cache: ConversionCache, sleep_time: int = 5) -> None:
+def start_tracking(loop: asyncio.AbstractEventLoop, cache: ConversationCache, sleep_time: int = 5) -> None:
     """
     Начать отслеживание метрик.
     :param loop: событийный цикл в котором необходимо создать задачи отслеживания метрик.

@@ -5,8 +5,8 @@ class ExistChatError(Exception):
     ...
 
 
-class NotExistChatError(Exception):
+class NoExistChatError(Exception):
     """
-    Ошибка несущестсующего чата
+    Ошибка несуществующего чата
     """
     ...

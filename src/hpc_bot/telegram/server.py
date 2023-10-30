@@ -7,18 +7,27 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.utils.markdown import hbold
 
-import settings
-from exceptions import ExistChatError, NotExistChatError
-from metrics import start_tracking
-from model.inference import ModelInference
-from telegram.cache import ConversionCache
-from telegram.manager import ModelManager
+from hpc_bot.exceptions import ExistChatError, NoExistChatError
+from hpc_bot.metrics import start_tracking
+from hpc_bot.model.inference import ModelInference
+from hpc_bot.settings import BOT_TOKEN
+from hpc_bot.telegram.cache import ConversationCache
+from hpc_bot.telegram.manager import ModelManager
+from hpc_bot.telegram.messages import (
+    CONFUSED_TEXT,
+    EXIST_CHAT_TEXT,
+    HELLO_TEXT,
+    HELP_TEXT,
+    NO_EXIST_CHAT_TEXT,
+    RESET_CHAT_TEXT,
+    TO_HARD_TEXT,
+)
 
-TOKEN: Final[str] = settings.BOT_TOKEN
+TOKEN: Final[str] = BOT_TOKEN
 
 dp: Dispatcher = Dispatcher()
 
-CACHE: Final[ConversionCache] = ConversionCache()
+CACHE: Final[ConversationCache] = ConversationCache()
 manager: ModelManager = ModelManager(
     inference=ModelInference(),
     cache=CACHE
@@ -37,15 +46,9 @@ async def command_start_handler(message: types.Message) -> None:
     try:
         await manager.start_conversion(message.chat.id, message.from_user.username)
     except ExistChatError:
-        await message.answer(
-            "У нас с тобой уже есть история переписки, если хочешь начать заново,"
-            " выбери команду /reset_context"
-        )
+        await message.answer(EXIST_CHAT_TEXT)
     else:
-        await message.answer(
-            f"Привествую, {hbold(message.from_user.full_name)}!\n"
-            "Это телеграм бот лаборатории HPCLab для общения с моделью LlaMa"
-        )
+        await message.answer(HELLO_TEXT.format(username=hbold(message.from_user.full_name)))
 
 
 @dp.message(Command('reset_context'))
@@ -55,7 +58,8 @@ async def command_clean_context(message: types.Message) -> None:
     :param message: сообщение от пользователя
     :return:
     """
-    await manager.reset_context(message.chat.id, message.from_user.username)
+    await manager.reset_context(message.chat.id)
+    await message.answer(RESET_CHAT_TEXT)
 
 
 @dp.message(Command('help'))
@@ -65,15 +69,7 @@ async def command_help_handler(message: types.Message) -> None:
     :param message: сообщение от пользователя
     :return:
     """
-    await message.answer(
-        '''
-        Я телеграмм бот LLM модели Llama 7B лаборатории HPC НИЯУ МИФИ.
-        Просто напиши в чат, чтобы общаться со мной.
-        /start - начать общение со мной.
-        /reset_context - сбросить историю переписок со мной.
-        /help - вызвать подсказку.
-        '''
-    )
+    await message.answer(HELP_TEXT)
 
 
 @dp.message()
@@ -86,10 +82,12 @@ async def conversation_handler(message: types.Message) -> None:
     try:
         model_answer: str = await manager.answer(message.chat.id, message.text)
         await message.answer(model_answer)
-    except NotExistChatError:
-        await message.answer("Похоже мы не начали общение, введи команду /start для старта переписки")
+    except RuntimeError:
+        await message.answer(TO_HARD_TEXT)
+    except NoExistChatError:
+        await message.answer(NO_EXIST_CHAT_TEXT)
     except Exception as e:
-        await message.answer("Извини, не понял тебя")
+        await message.answer(CONFUSED_TEXT)
         _LOGGER.exception(e)
 
 
