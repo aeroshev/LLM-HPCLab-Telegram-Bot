@@ -1,0 +1,3 @@
+[flake8]
+exclude = __pycache__, messages
+max-line-length = 108

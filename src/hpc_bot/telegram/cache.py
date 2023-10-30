@@ -2,28 +2,46 @@ import os
 
 import redis.asyncio as redis
 
-from model.conversion import Message
+from hpc_bot.model.conversion import Message
 
 
-class ConversionCache:
+class ConversationCache:
     """
     Кэш для хранения переписок с моделью
     """
+    KEY_PATTERN: str = 'conversation:{chat_id}'
+    USER_CHAT: str = 'active_chats_users'
+
     __slots__ = ('cache',)
 
     def __init__(self) -> None:
         cache_host: str = os.environ.get('CACHE_ADDRESS', 'localhost')
         self.cache = redis.Redis(host=cache_host, port=6379, decode_responses=True)
-    
+
+    async def start_conversation(self, chat_id: int, username: str) -> None:
+        """
+        Создать ключ переписки с указанием username пользователя.
+        :param chat_id: индефикатор чата в Telegram.
+        :param username: логин пользователя.
+        :param message: сообщение заданного формата.
+        :return:
+        """
+        await self.cache.hset(
+            self.USER_CHAT,
+            str(chat_id),
+            username
+        )
+
     async def put_message(self, chat_id: int, message: Message) -> None:
 
         """
-        Положить новое сообщение в кэш
-        :param chat_id: индефикатор чата в Telegram
+        Положить новое сообщение в кэш.
+        :param chat_id: индефикатор чата в Telegram.
+        :param message: сообщение заданного формата.
         :return:
         """
         await self.cache.rpush(
-            f'conversation:{chat_id}',
+            self.KEY_PATTERN.format(chat_id=chat_id),
             message.model_dump_json()
         )
 
@@ -33,8 +51,16 @@ class ConversionCache:
         :param chat_id: индефикатор чата в Telegram
         :return:
         """
-        await self.cache.delete(f'conversation:{chat_id}')
-    
+        await self.cache.delete(self.KEY_PATTERN.format(chat_id=chat_id))
+
+    async def pop_first_message(self, chat_id: int) -> None:
+        """
+        Выбросить первое сообщение из переписки
+        :param chat_id: индефикатор чата в Telegram
+        :return:
+        """
+        await self.cache.lpop(self.KEY_PATTERN.format(chat_id=chat_id))
+
     async def get_correspondence(self, chat_id: int) -> list[Message]:
         """
         Получить всю переписку конркетного чата
@@ -42,7 +68,7 @@ class ConversionCache:
         :return: список всех сообщений
         """
         messages: list[str] = await self.cache.lrange(
-            f'conversation:{chat_id}',
+            self.KEY_PATTERN.format(chat_id=chat_id),
             0,
             -1
         )
@@ -57,7 +83,7 @@ class ConversionCache:
         :param chat_id: индефикатор чата в Telegram
         :return: глубина переписки
         """
-        return await self.cache.llen(f'conversation:{chat_id}')
+        return await self.cache.llen(self.KEY_PATTERN.format(chat_id=chat_id))
 
     async def metric_chat_counts(self) -> int:
         """
@@ -65,21 +91,15 @@ class ConversionCache:
         :param:
         :return: количество активных чатов
         """
-        return len([
-            key
-            async for key in self.cache.scan_iter('conversation:*')
-        ])
-    
+        return await self.cache.hlen(self.USER_CHAT)
+
     async def get_actual_chats(self) -> list[str]:
         """
         Получить все актуальные чаты.
         :param:
         :return: индефикаторы актуальных чатов.
         """
-        return [
-            key.split(':')[1]
-            async for key in self.cache.scan_iter('conversation:*')
-        ]
+        return await self.cache.hkeys(self.USER_CHAT)
 
     async def exist_chat(self, chat_id: int) -> bool:
         """
@@ -87,5 +107,5 @@ class ConversionCache:
         :param chat_id: индефикатор чата в Telegram.
         :return: существует или не существует выбранный чат.
         """
-        quantity: int = await self.cache.exists(f"conversation:{chat_id}")
-        return True if quantity > 0 else False
+        username: str | None = await self.cache.hget(self.USER_CHAT, str(chat_id))
+        return True if username else False
