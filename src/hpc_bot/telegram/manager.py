@@ -1,5 +1,6 @@
 import gc
 import logging
+from typing import Final
 
 import torch
 
@@ -8,7 +9,7 @@ from hpc_bot.model.conversion import DEFAULT_SYSTEM_PROMPT, Conversation, Messag
 from hpc_bot.model.inference import ModelInference
 from hpc_bot.telegram.cache import ConversationCache
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 class ModelManager:
@@ -17,8 +18,8 @@ class ModelManager:
     """
 
     __slots__ = (
-        'inference',
-        'cache'
+        '_inference',
+        '_cache'
     )
 
     def __init__(
@@ -26,8 +27,8 @@ class ModelManager:
         inference: ModelInference,
         cache: ConversationCache
     ) -> None:
-        self.inference: ModelInference = inference
-        self.cache: ConversationCache = cache
+        self._inference: ModelInference = inference
+        self._cache: ConversationCache = cache
 
     @property
     def start_message(self) -> Message:
@@ -66,7 +67,7 @@ class ModelManager:
         """
         max_size = max_size or (conversation.size - 1)
         while conversation.size > max_size and len(conversation) > 1:
-            await self.cache.pop_first_message(chat_id)
+            await self._cache.pop_first_message(chat_id)
             conversation.pop_first_message()
 
         if len(conversation) < 2:
@@ -80,39 +81,27 @@ class ModelManager:
         :param username: логин пользователя.
         :return:
         """
-        exist: bool = await self.cache.exist_chat(chat_id)
+        exist: bool = await self._cache.exist_chat(chat_id)
         if exist:
             raise ExistChatError()
 
-        await self.cache.start_conversation(chat_id, username)
+        await self._cache.start_conversation(chat_id, username)
 
-    async def answer(self, chat_id: int, message: str) -> str:
+    async def slide_window_asnwer(self, conversation: Conversation, chat_id: int) -> str:
         """
-        Получить ответ от модели.
-        :param chat_id: индефикатор чата, для различия пользователей.
-        :param message: сообщение от пользователя.
-        :return: сообщение от модели.
+        Задать вопрос модели в режиме скользящего окна. Если память переполнилась, то старые сообщения будут вытесняться.
+        :param conversation: переписка с пользователем.
+        :param chat_id: индефикатор чата пользователя.
+        :return: ответ модели.
         """
-        exist: bool = await self.cache.exist_chat(chat_id)
-        if not exist:
-            raise NoExistChatError()
-
-        messages: list[Message] = [self.start_message]
-        messages += await self.cache.get_correspondence(chat_id)
-
-        user_message: Message = Message(role=Role.USER, content=message)
-        messages.append(user_message)
-        await self.cache.put_message(chat_id, user_message)
-
-        conversation: Conversation = Conversation(messages=messages)
-
-        run: bool = True
-        while run:
+        while True:
             try:
-                output: str = self.inference(conversation)
-                run = False
+                output: str = self._inference(conversation)
+                break
             except torch.cuda.OutOfMemoryError:
-                _LOGGER.warning(f"Закончилась память, длина контекста - {conversation.size}")
+                _LOGGER.warning(
+                    f"Закончилась память, длина контекста - {conversation.size}, чат - {chat_id}"
+                )
                 await self.compress_conversation(conversation, chat_id)
             except Exception as e:
                 _LOGGER.exception(e)
@@ -120,8 +109,59 @@ class ModelManager:
             finally:
                 self.clean_mem()
 
+        return output
+
+    async def inline_answer(self, conversation: Conversation, chat_id: int) -> str:
+        """
+        Задать вопрос модели в линейном режиме. Если память переполнилась, то сообщить об этом пользователю.
+        :param conversation: переписка с пользователем.
+        :param chat_id: индефикатор чата пользователя.
+        :return: ответ модели.
+        """
+        try:
+            output: str = self._inference(conversation)
+        except torch.cuda.OutOfMemoryError as e:
+            _LOGGER.warning(
+                f"Закончилась память, длина контекста - {conversation.size}, чат - {chat_id}"
+            )
+            raise e
+        except Exception as e:
+            _LOGGER.exception(e)
+            raise e
+        finally:
+            self.clean_mem()
+
+        return output
+
+    async def answer(self, chat_id: int, message: str, state: str) -> str:
+        """
+        Получить ответ от модели.
+        :param chat_id: индефикатор чата, для различия пользователей.
+        :param message: сообщение от пользователя.
+        :return: сообщение от модели.
+        """
+        exist: bool = await self._cache.exist_chat(chat_id)
+        if not exist:
+            raise NoExistChatError()
+
+        messages: list[Message] = [self.start_message]
+        messages += await self._cache.get_correspondence(chat_id)
+
+        user_message: Message = Message(role=Role.USER, content=message)
+        messages.append(user_message)
+        await self._cache.put_message(chat_id, user_message)
+
+        conversation: Conversation = Conversation(messages=messages)
+
+        if state == 'UserMode:window':
+            output: str = await self.slide_window_asnwer(conversation, chat_id)
+        elif state == 'UserMode:inline':
+            output: str = await self.inline_answer(conversation, chat_id)
+        else:
+            raise RuntimeError("Can't determine state")
+
         bot_message: Message = Message(role=Role.BOT, content=output)
-        await self.cache.put_message(chat_id, bot_message)
+        await self._cache.put_message(chat_id, bot_message)
 
         return output
 
@@ -131,4 +171,4 @@ class ModelManager:
         :param chat_id: индефикатор чата, для различия пользователей.
         :return:
         """
-        await self.cache.clear_conversion(chat_id)
+        await self._cache.clear_conversion(chat_id)
