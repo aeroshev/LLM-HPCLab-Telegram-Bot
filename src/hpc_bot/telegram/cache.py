@@ -3,9 +3,10 @@ import os
 import redis.asyncio as redis
 
 from hpc_bot.model.conversion import Message
+from hpc_bot.singleton import Singleton
 
 
-class ConversationCache:
+class ConversationCache(metaclass=Singleton):
     """
     Кэш для хранения переписок с моделью
     """

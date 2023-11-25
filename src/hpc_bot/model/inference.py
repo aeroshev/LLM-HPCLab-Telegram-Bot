@@ -15,11 +15,12 @@ from transformers import (
 
 from hpc_bot.metrics import REQUEST_TIME
 from hpc_bot.model.conversion import Conversation
+from hpc_bot.singleton import Singleton
 
 MODEL_NAME: Final[str] = "IlyaGusev/saiga_mistral_7b"
 
 
-class ModelInference:
+class ModelInference(metaclass=Singleton):
     """
     Инференс модели для старта модели и взаимодействия с ней.
     """
